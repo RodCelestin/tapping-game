@@ -55,7 +55,7 @@ struct ContentView: View {
         VStack {
             if isGameActive {
                 Text("\(formattedTime)")
-                    .font(.custom("Omnes SemiBold", size: 24))
+                    .font(.custom("Omnes SemiBold", size: 36))
                     .padding()
                     .foregroundColor(.white)
             }
@@ -241,10 +241,10 @@ struct ContentView: View {
     
     private func updateDynamicMessage() {
         switch tapCount {
-            case 10: dynamicMessage = "Good"
-            case 30: dynamicMessage = "Harder!"
-            case 50: dynamicMessage = "Crush it!!!"
-            case 70: dynamicMessage = "MORE!!!"
+            case 10: dynamicMessage = "Good 👍"
+            case 30: dynamicMessage = "Harder! 🤟"
+            case 50: dynamicMessage = "Crush it! 😠"
+            case 70: dynamicMessage = "MORE! 😡"
             default: break // Keep the current message or do nothing
         }
     }
