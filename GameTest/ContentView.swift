@@ -39,27 +39,15 @@ struct ContentView: View {
     // State variable to control LeaderboardEntryView
     @State private var showLeaderboardEntry = false
     
-    // State variable to control AchievementsView
-    @State private var showAchievements = false
-    
-    // Achievement Service
-    @StateObject private var achievementService = AchievementService()
-    
     // UserDefaults key for total taps
     private let totalTapsKey = "totalGameTaps"
-    // Computed property to get/set total taps from UserDefaults
-    private var totalTaps: Int {
-        get { UserDefaults.standard.integer(forKey: totalTapsKey) }
-        set { UserDefaults.standard.set(newValue, forKey: totalTapsKey) }
-    }
+    // State property for total taps
+    @State private var totalTaps: Int = UserDefaults.standard.integer(forKey: "totalGameTaps")
     
     // UserDefaults key for games played
     private let gamesPlayedKey = "totalGamesPlayed"
-    // Computed property to get/set games played from UserDefaults
-    private var gamesPlayed: Int {
-        get { UserDefaults.standard.integer(forKey: gamesPlayedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: gamesPlayedKey) }
-    }
+    // State property for games played
+    @State private var gamesPlayed: Int = UserDefaults.standard.integer(forKey: "totalGamesPlayed")
     
     // Computed property for the circle color based on tap count
     private var circleColor: Color {
@@ -226,23 +214,6 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(CustomPressableButtonStyle())
-                
-                // Button to show Achievements
-                Button(action: {
-                    showAchievements = true
-                }) {
-                    HStack(alignment: .center) {
-                        Spacer()
-                        Text("Show Achievements")
-                            .font(.system(size: 16, weight: .semibold, design: .default))
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(Color(hex: "009DE0"))
-                            .frame(maxWidth: .infinity, alignment: .top)
-                        Spacer()
-                    }
-                }
-                .buttonStyle(CustomPressableButtonStyle())
-                .padding(.top, 12) // Add space above the button
             }
         }
         .padding(20)
@@ -255,10 +226,6 @@ struct ContentView: View {
         .sheet(isPresented: $showLeaderboardEntry) {
             LeaderboardEntryView(score: tapCount, showResult: $showResult, showLeaderboardEntry: $showLeaderboardEntry)
         }
-        .sheet(isPresented: $showAchievements) {
-            AchievementsView()
-                .environmentObject(achievementService) // Provide the environment object
-        }
         .onChange(of: showLeaderboardEntry) { newValue in
             if !newValue && showResult == false {
                  resetGameState()
@@ -267,16 +234,9 @@ struct ContentView: View {
     }
     
     private func animateTap() {
-        // Unlock "First Tap!" achievement on the very first tap
-        if totalTaps == 0 {
-            achievementService.unlockAchievement(id: "first_tap")
-        }
-        
-        // Increment total taps and check for "Tapper Beginner" achievement
+        // Increment total taps
         totalTaps += 1
-        if totalTaps >= 100 {
-            achievementService.unlockAchievement(id: "tapper_beginner")
-        }
+        UserDefaults.standard.set(totalTaps, forKey: totalTapsKey)
         
         // Random direction for the bounce
         let randomAngle = Double.random(in: 0..<2 * .pi)
@@ -360,6 +320,7 @@ struct ContentView: View {
         
         // Increment games played when a new game starts
         gamesPlayed += 1
+        UserDefaults.standard.set(gamesPlayed, forKey: gamesPlayedKey)
     }
     
     private func endGame() {
@@ -369,14 +330,6 @@ struct ContentView: View {
         showResult = true
         shockwaves = [] // Clear shockwaves on end game
         dynamicMessage = "" // Clear message on end game
-        
-        // Check for "Score of 50!" achievement at the end of the game
-        achievementService.checkScoreAchievement(score: tapCount)
-        
-        // Check for "Time Master" achievement at the end of the game
-        if gamesPlayed >= 10 {
-            achievementService.unlockAchievement(id: "time_master")
-        }
     }
     
     private func restartGame() {
