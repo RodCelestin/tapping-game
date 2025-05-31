@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import Combine // Import Combine for ObservableObject
 
 // Define a struct to represent an individual shockwave
 struct Shockwave: Identifiable {
@@ -17,7 +18,7 @@ struct Shockwave: Identifiable {
 
 struct ContentView: View {
     @State private var tapCount = 0
-    @State private var timeRemaining: Double = 15.0
+    @State private var timeRemaining: Double = 5.0
     @State private var isGameActive = false
     @State private var timer: Timer?
     @State private var showResult = false
@@ -34,6 +35,31 @@ struct ContentView: View {
     
     // State variable to hold the dynamic message
     @State private var dynamicMessage: String = ""
+    
+    // State variable to control LeaderboardEntryView
+    @State private var showLeaderboardEntry = false
+    
+    // State variable to control AchievementsView
+    @State private var showAchievements = false
+    
+    // Achievement Service
+    @StateObject private var achievementService = AchievementService()
+    
+    // UserDefaults key for total taps
+    private let totalTapsKey = "totalGameTaps"
+    // Computed property to get/set total taps from UserDefaults
+    private var totalTaps: Int {
+        get { UserDefaults.standard.integer(forKey: totalTapsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: totalTapsKey) }
+    }
+    
+    // UserDefaults key for games played
+    private let gamesPlayedKey = "totalGamesPlayed"
+    // Computed property to get/set games played from UserDefaults
+    private var gamesPlayed: Int {
+        get { UserDefaults.standard.integer(forKey: gamesPlayedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: gamesPlayedKey) }
+    }
     
     // Computed property for the circle color based on tap count
     private var circleColor: Color {
@@ -172,6 +198,22 @@ struct ContentView: View {
             }
             
             if showResult {
+                Button(action: {
+                    showLeaderboardEntry = true
+                }) {
+                    HStack(alignment: .center) {
+                        Spacer()
+                        Text("Enter leaderboard")
+                            .font(.system(size: 16, weight: .semibold, design: .default))
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(Color(hex: "009DE0"))
+                            .frame(maxWidth: .infinity, alignment: .top)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(CustomPressableButtonStyle())
+                .padding(.bottom, 12) // Add some space between the buttons
+                
                 Button(action: restartGame) {
                     HStack(alignment: .center) {
                         Spacer()
@@ -184,6 +226,23 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(CustomPressableButtonStyle())
+                
+                // Button to show Achievements
+                Button(action: {
+                    showAchievements = true
+                }) {
+                    HStack(alignment: .center) {
+                        Spacer()
+                        Text("Show Achievements")
+                            .font(.system(size: 16, weight: .semibold, design: .default))
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(Color(hex: "009DE0"))
+                            .frame(maxWidth: .infinity, alignment: .top)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(CustomPressableButtonStyle())
+                .padding(.top, 12) // Add space above the button
             }
         }
         .padding(20)
@@ -193,9 +252,32 @@ struct ContentView: View {
                 .resizable()
                 .ignoresSafeArea()
         )
+        .sheet(isPresented: $showLeaderboardEntry) {
+            LeaderboardEntryView(score: tapCount, showResult: $showResult, showLeaderboardEntry: $showLeaderboardEntry)
+        }
+        .sheet(isPresented: $showAchievements) {
+            AchievementsView()
+                .environmentObject(achievementService) // Provide the environment object
+        }
+        .onChange(of: showLeaderboardEntry) { newValue in
+            if !newValue && showResult == false {
+                 resetGameState()
+            }
+        }
     }
     
     private func animateTap() {
+        // Unlock "First Tap!" achievement on the very first tap
+        if totalTaps == 0 {
+            achievementService.unlockAchievement(id: "first_tap")
+        }
+        
+        // Increment total taps and check for "Tapper Beginner" achievement
+        totalTaps += 1
+        if totalTaps >= 100 {
+            achievementService.unlockAchievement(id: "tapper_beginner")
+        }
+        
         // Random direction for the bounce
         let randomAngle = Double.random(in: 0..<2 * .pi)
         let randomDistance = CGFloat.random(in: 5...15)
@@ -253,7 +335,7 @@ struct ContentView: View {
         isGameActive = true
         showResult = false
         tapCount = 0
-        timeRemaining = 15.0
+        timeRemaining = 5.0
         tapBounceScale = 1.0
         pressScale = 1.0
         offset = .zero
@@ -275,6 +357,9 @@ struct ContentView: View {
                 endGame()
             }
         }
+        
+        // Increment games played when a new game starts
+        gamesPlayed += 1
     }
     
     private func endGame() {
@@ -284,6 +369,14 @@ struct ContentView: View {
         showResult = true
         shockwaves = [] // Clear shockwaves on end game
         dynamicMessage = "" // Clear message on end game
+        
+        // Check for "Score of 50!" achievement at the end of the game
+        achievementService.checkScoreAchievement(score: tapCount)
+        
+        // Check for "Time Master" achievement at the end of the game
+        if gamesPlayed >= 10 {
+            achievementService.unlockAchievement(id: "time_master")
+        }
     }
     
     private func restartGame() {
@@ -291,7 +384,7 @@ struct ContentView: View {
         isGameActive = false
         showResult = false
         tapCount = 0
-        timeRemaining = 15.0 // Reset time visually, but timer isn't running yet
+        timeRemaining = 5.0 // Reset time visually, but timer isn't running yet
         tapBounceScale = 1.0
         pressScale = 1.0
         offset = .zero
@@ -316,6 +409,36 @@ struct ContentView: View {
         }
         
         // The timer will be started by the onTapGesture on the Circle
+    }
+    
+    private func resetGameState() {
+        // Reset all game state to initial values
+        isGameActive = false
+        showResult = false
+        tapCount = 0
+        timeRemaining = 5.0
+        tapBounceScale = 1.0
+        pressScale = 1.0
+        offset = .zero
+        shockwaves = []
+        dynamicMessage = ""
+        
+        // Reset initial animation states
+        initialOffset = 40
+        initialOpacity = 0
+        
+        // Trigger initial appearance animation
+        withAnimation(.easeOut(duration: 0.6)) {
+            initialOffset = 0
+            initialOpacity = 1
+        }
+        
+        // Start floating animation after fade-in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                floatingOffset = -25
+            }
+        }
     }
 }
 
